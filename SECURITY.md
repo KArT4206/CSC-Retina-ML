@@ -2,11 +2,11 @@
 
 ## Scope
 
-This policy covers the CSC OCT Analyser web application and the research pipeline. It does not cover Hugging Face's hosting infrastructure or the public datasets.
+This policy covers the CSC OCT Analyser web application and the research pipeline. It does not cover the public datasets.
 
 ## Data handling
 
-When `CSC_PUBLIC=1` (as on the live demo), uploaded scans are deleted after analysis and the history page shows nothing, so one visitor cannot see another's scans. Do not upload identifiable patient images to the public demo.
+When `CSC_PUBLIC=1` (recommended whenever the app is reachable by other people), uploaded scans are deleted after analysis and the history page shows nothing, so one visitor cannot see another's scans.
 
 ## Reporting a vulnerability
 

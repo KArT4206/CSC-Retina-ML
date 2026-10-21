@@ -1,0 +1,560 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CSC Detection · Report</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>:root{--bg:#f6f7f9;--s:#fff;--b:#e2e5ea;--t:#111827;--t2:#374151;--a:#1d4ed8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--s:#151b23;--b:#2a323d;--t:#e6e9ee;--t2:#c3cad3;--a:#6b9bff}}
+:root[data-theme="dark"]{--bg:#0d1117;--s:#151b23;--b:#2a323d;--t:#e6e9ee;--t2:#c3cad3;--a:#6b9bff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 Inter,system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:40px 16px 80px}h1{font-size:clamp(26px,5vw,34px);line-height:1.2;letter-spacing:-.02em}
+h2{margin-top:44px;padding-top:12px;border-top:1px solid var(--b)}h3{margin-top:28px}p,li{color:var(--t2)}a{color:var(--a)}
+img{max-width:100%;border:1px solid var(--b);border-radius:8px;background:#fff}
+table{display:block;overflow-x:auto;border-collapse:collapse;margin:14px 0;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--b);padding:6px 10px;text-align:left;white-space:nowrap}th{background:var(--s)}
+pre{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:12px;overflow-x:auto;font-size:13px}code{font-size:.92em}
+.back{display:inline-block;margin-bottom:12px}</style></head><body><main><a class="back" href="./">← Project overview</a><h1>CSC Detection from OCT: project report</h1>
+<p><strong>Deep learning-based automated detection and subtyping of central serous chorioretinopathy (CSC) using optimized multi-model weighted feature fusion</strong></p>
+<p>Sai Sathya Krishna A R, Karthik B, Adharsh Ramakrishnan, and Dr. Swaminathan A (supervisor)
+Clinical guidance: Dr. Kundanam Balaram Poornima
+School of Computer Science and Engineering, Vellore Institute of Technology, Chennai</p>
+<p>Research software. Not a medical device.</p>
+<h2>Contents</h2>
+<ol>
+<li>Summary</li>
+<li>Clinical background</li>
+<li>Motivation and objectives</li>
+<li>Data</li>
+<li>Method</li>
+<li>Evaluation protocol</li>
+<li>Results</li>
+<li>Discussion</li>
+<li>The application</li>
+<li>Reproducing the study</li>
+<li>Limitations and future work</li>
+<li>References</li>
+</ol>
+<h2>1. Summary</h2>
+<p>The project detects central serous chorioretinopathy (CSC) on OCT B-scans with an optimised fusion of five pretrained CNNs and asks a second question alongside: do high scores come from the disease or from how the images were collected? It makes four contributions:</p>
+<ol>
+<li><strong>Leak-free multi-model fusion (R1 → R2 → R3).</strong> Four of five backbones are chosen on validation data; their features are compressed with PCA and weighted by a genetic algorithm whose fitness is a patient-grouped cross-validated log-loss on out-of-fold features. Two new fusion rules are added: uncertainty-aware gated fusion (UAGF) and a cross-attention head.</li>
+<li><strong>NSGA-II Pareto fusion.</strong> Fusion is posed as a three-objective problem (sensitivity, specificity, number of models), giving balanced and screening operating points chosen on training data only.</li>
+<li><strong>Uncertainty-aware referral.</strong> An MC-dropout ensemble refers the most uncertain scans to a clinician.</li>
+<li><strong>A shortcut-controlled evaluation protocol.</strong> Canonical preprocessing with harmonisation, patient-grouped nested cross-validation over five seeds, no-CNN shortcut probes, shuffled-label and thumbnail controls, matched-type evaluation and patient-level bootstrap intervals.</li>
+</ol>
+<p>On the same-scanner dataset, simple probability ensembles performed best (per-seed AUC 0.954). Referring the 30% most uncertain scans raised MC-dropout balanced accuracy from 0.913 to 0.949. GA-weighted feature fusion (R2 0.851, R3 0.700) did not beat the best single backbone, because each training fold held only two CSC patient groups. The widely used Retinal OCT-C8 benchmark turned out to be separable from 16 × 16 thumbnails (AUC 1.000), and controlling for export type reduced the same-scanner AUC from about 0.96 to a matched-type AUC of about 0.78.</p>
+<h2>2. Clinical background</h2>
+<p>CSC is a serous detachment of the neurosensory retina at the posterior pole. Subretinal fluid leaks through defects in the retinal pigment epithelium (RPE) from a hyperpermeable, congested choroid and collects between the photoreceptors and the RPE. It typically affects adults aged 20 to 50, more often men, and is associated with corticosteroid use and stress. Patients notice blurred or distorted central vision, micropsia and a central scotoma.</p>
+<p>Acute CSC shows a dome-shaped detachment, often with a small pigment epithelial detachment at the leak, and usually resolves within three to four months. Chronic CSC has persistent or recurrent fluid, diffuse RPE damage, shallow irregular detachments and eventually photoreceptor loss, and is usually treated (for example with photodynamic therapy or micropulse laser). On OCT both appear as dark fluid under an elevated retina, and telling them apart is hard even for specialists.</p>
+<h2>3. Motivation and objectives</h2>
+<p>Published CSC classifiers mostly use one CNN, one fixed threshold and random image-level splits of public data. A preliminary benchmark in this project showed the risk: eight backbones trained for one epoch on Retinal OCT-C8 reached validation accuracies of 0.8757 to 1.0000, with four tied at exactly 1.0000. Saturated scores cannot rank models and leave nothing for fusion to improve, and they raised the question of whether the networks were detecting CSC at all.</p>
+<p>The objectives were to benchmark backbones (R1), compress and weight their features (R2), fuse them with the primary model (R3), compare against probability-level ensembles, add multi-objective operating points and uncertainty-based referral, and evaluate everything under a protocol that controls for leakage and shortcuts.</p>
+<h2>4. Data</h2>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Content</th>
+<th>Labels used</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Same-scanner composite (Hassan, Akram and Nazir, 2021)</td>
+<td>Topcon exports per patient and eye; volume frames and report screenshots</td>
+<td>Healthy, acute CSR, chronic CSR</td>
+<td>Primary benchmark; only source of subtype labels and patient IDs</td>
+</tr>
+<tr>
+<td>Retinal OCT-C8 (Kaggle)</td>
+<td>24,000 B-scans, 8 classes, no patient IDs</td>
+<td>Normal, CSR (600 per class)</td>
+<td>Second benchmark</td>
+</tr>
+<tr>
+<td>OCTID (Gholami et al., 2020)</td>
+<td>Over 500 B-scans, 5 classes</td>
+<td>Normal, CSR</td>
+<td>External test only</td>
+</tr>
+</tbody>
+</table>
+<p>Patients in the same-scanner data are identified by the scanner patient ID in the file names. Exact duplicates are removed by MD5 hash and near-duplicates (64-bit perceptual hash, Hamming distance ≤ 4) are kept in one group so they never straddle a split.</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Same-scanner</th>
+<th>OCT-C8 subset</th>
+<th>OCTID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Images used, normal / CSC</td>
+<td>42 / 264</td>
+<td>595 / 595</td>
+<td>205 / 102</td>
+</tr>
+<tr>
+<td>Groups</td>
+<td>32</td>
+<td>1,190</td>
+<td>307</td>
+</tr>
+<tr>
+<td>Image kinds</td>
+<td>256 frames, 50 screenshots</td>
+<td>n/a</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>Only five same-scanner patients have CSC (three acute, two chronic), forming four groups. All 42 normal images are report screenshots, while 256 of 264 CSC images are volume frames. This export-type imbalance is controlled by the matched-type evaluation.</p>
+<h2>5. Method</h2>
+<p><img alt="Architecture" src="figures/architecture.png" /></p>
+<h3>5.1 Canonical preprocessing and harmonisation</h3>
+<p><img alt="Preprocessing" src="figures/preprocessing.png" /></p>
+<p>Every image takes the same path: grayscale, crop of overlay text and colour bar, percentile normalisation g′ = clip((g − P1) / (P99.5 − P1), 0, 1), optional harmonisation H(I) = JPEG₇₀(G_σ=1 ∗ Downsample₂(I)), and a 224 × 224 bicubic resize. Harmonisation removes fine differences in resolution, sharpening and compression between export types; its effect is measured by an ablation.</p>
+<h3>5.2 Patient-grouped nested cross-validation</h3>
+<p><img alt="Grouped CV" src="figures/grouped_cv.png" /></p>
+<p>All splits are made over groups. The outer level tests each group once (four folds on the same-scanner data, each with one CSC group); a validation subset handles early stopping and backbone ranking; inner folds produce out-of-fold features for the meta stage. Everything is repeated for five seeds, and assertions fail the run if any group or eye appears in two parts.</p>
+<h3>5.3 R1: backbones</h3>
+<p>ResNet-34, ResNet-50, DenseNet-121, EfficientNet-B0 and MobileNetV3-Large (ImageNet) are fine-tuned with half their parameters frozen, a Dropout(0.3) + Linear head, AdamW (10⁻³ head, 10⁻⁴ backbone), cosine annealing over 15 epochs, label smoothing 0.1, class-weighted sampling and early stopping. The four with the best validation score become M1 to M4.</p>
+<h3>5.4 R2 and R3: PCA and genetic-algorithm fusion</h3>
+<p>Each model's out-of-fold features are standardised and projected onto 32 whitened principal components, z_i. R2 concatenates the secondary blocks with GA weights on the simplex, x_R2 = [w2 z2, w3 z3, w4 z4], and the GA (DEAP; population 24, 25 generations) minimises the grouped three-fold cross-validated log-loss of a logistic regression. R3 concatenates z1 with x_R2 (128 features) and classifies them with a small MLP whose width and dropout are chosen by grouped cross-validation.</p>
+<h3>5.5 Probability ensembles and UAGF</h3>
+<p>The Top-4 probabilities are combined by plain averaging, temperature-scaled averaging, GA weights and UAGF. UAGF weights each model per image by the binary entropy of its calibrated probability:</p>
+<p>H_i(x) = −p_i ln p_i − (1 − p_i) ln(1 − p_i),  g_i(x) = softmax_i(a_i − β H_i(x)),  p_UAGF(x) = Σ_i g_i(x) p_i(x)</p>
+<p><img alt="UAGF" src="figures/uagf.png" /></p>
+<h3>5.6 NSGA-II Pareto fusion</h3>
+<p>Each candidate encodes four weights and a threshold. NSGA-II (population 40, 30 generations) maximises sensitivity and specificity and minimises the number of models with weight above 0.05. The balanced point maximises balanced accuracy on the Pareto front; the screening point maximises specificity subject to sensitivity ≥ 0.95. Both are chosen on out-of-fold training data.</p>
+<h3>5.7 MC-dropout and refer-to-clinician</h3>
+<p>Each Top-4 head runs 20 passes with dropout p = 0.3. The mean P(CSC) over passes and models is the prediction and the mean of per-model variances is the uncertainty. Test scans are ranked by uncertainty and the most certain 100%, 90%, 80% or 70% are kept.</p>
+<h3>5.8 Shortcut probes and controls</h3>
+<p>Before any CNN is trained, a random forest is evaluated on features that cannot encode lesion shape: raw image and file size, a 16 × 16 thumbnail, intensity and texture statistics, and export type within the CSC class. A gated probe above AUC 0.70 stops the run unless forced. A shuffled-label control permutes training labels at the group level, and a thumbnail CNN bounds what global appearance alone can achieve.</p>
+<h2>6. Evaluation protocol</h2>
+<p>Metrics are AUC, balanced accuracy, sensitivity, specificity, F1, MCC and ECE. Each method is reported per seed (mean ± SD) and after averaging predictions over seeds, with 95% patient-level bootstrap intervals (1,000 resamples). On the same-scanner data the headline is the matched-type AUC on screenshots only (50 images, 8 CSC), where both classes share the export path.</p>
+<h2>7. Results</h2>
+<h3>7.1 Shortcut probes</h3>
+<table>
+<thead>
+<tr>
+<th>Probe</th>
+<th>Same-scanner (harmonised)</th>
+<th>Same-scanner (not harmonised)</th>
+<th>OCT-C8</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw image size</td>
+<td>0.987</td>
+<td>0.987</td>
+<td>1.000</td>
+</tr>
+<tr>
+<td>Raw file size</td>
+<td>0.950</td>
+<td>0.950</td>
+<td>0.896</td>
+</tr>
+<tr>
+<td>16 × 16 thumbnail</td>
+<td>0.706</td>
+<td>0.711</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td>Texture / intensity</td>
+<td>0.420</td>
+<td>0.826</td>
+<td>1.000</td>
+</tr>
+<tr>
+<td>PNG size</td>
+<td>0.532</td>
+<td>0.364</td>
+<td>0.690</td>
+</tr>
+<tr>
+<td>Export type (CSC only)</td>
+<td>0.693</td>
+<td>0.692</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>On OCT-C8 a random forest on a 16 × 16 thumbnail separates the classes with AUC 0.998 and simple intensity statistics reach 1.000, because the classes were acquired at different resolutions. On the same-scanner data, harmonisation removed the texture cue (0.826 → 0.420).</p>
+<h3>7.2 Backbones (R1)</h3>
+<table>
+<thead>
+<tr>
+<th>Backbone</th>
+<th>AUC</th>
+<th>Balanced accuracy</th>
+<th>Times in Top-4 (of 20)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ResNet-34</td>
+<td>0.940 ± 0.046</td>
+<td>0.870 ± 0.082</td>
+<td>20</td>
+</tr>
+<tr>
+<td>ResNet-50</td>
+<td>0.887 ± 0.075</td>
+<td>0.783 ± 0.089</td>
+<td>16</td>
+</tr>
+<tr>
+<td>DenseNet-121</td>
+<td>0.950 ± 0.038</td>
+<td>0.889 ± 0.063</td>
+<td>19</td>
+</tr>
+<tr>
+<td>EfficientNet-B0</td>
+<td>0.898 ± 0.115</td>
+<td>0.801 ± 0.135</td>
+<td>17</td>
+</tr>
+<tr>
+<td>MobileNetV3-Large</td>
+<td>0.846 ± 0.086</td>
+<td>0.680 ± 0.122</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Learning curves" src="figures/learning_curves.png" /></p>
+<p>Training macro-F1 reached 0.93 to 0.98 while validation macro-F1 peaked at about 0.65 to 0.78, a large generalisation gap that reflects the small number of patients.</p>
+<h3>7.3 Fusion compared</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>AUC per seed</th>
+<th>AUC ensembled [95% CI]</th>
+<th>Balanced accuracy</th>
+<th>Sensitivity</th>
+<th>Specificity</th>
+<th>MCC</th>
+<th>ECE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1 M1 alone</td>
+<td>0.932 ± 0.018</td>
+<td>0.963 [0.922, 0.995]</td>
+<td>0.849 ± 0.025</td>
+<td>0.894</td>
+<td>0.805</td>
+<td>0.601</td>
+<td>0.120</td>
+</tr>
+<tr>
+<td>R2 GA-weighted M2–M4</td>
+<td>0.851 ± 0.052</td>
+<td>0.930 [0.854, 0.992]</td>
+<td>0.768 ± 0.045</td>
+<td>0.751</td>
+<td>0.786</td>
+<td>0.398</td>
+<td>0.126</td>
+</tr>
+<tr>
+<td>R3 full fusion</td>
+<td>0.700 ± 0.110</td>
+<td>0.932 [0.820, 1.000]</td>
+<td>0.646 ± 0.082</td>
+<td>0.735</td>
+<td>0.557</td>
+<td>0.221</td>
+<td>0.275</td>
+</tr>
+<tr>
+<td>Average ensemble</td>
+<td>0.954 ± 0.010</td>
+<td>0.963 [0.917, 0.996]</td>
+<td>0.909 ± 0.016</td>
+<td>0.885</td>
+<td>0.933</td>
+<td>0.675</td>
+<td>0.160</td>
+</tr>
+<tr>
+<td>Temperature-scaled ensemble</td>
+<td>0.938 ± 0.016</td>
+<td>0.952 [0.893, 0.996]</td>
+<td>0.890 ± 0.032</td>
+<td>0.865</td>
+<td>0.914</td>
+<td>0.633</td>
+<td>0.106</td>
+</tr>
+<tr>
+<td>GA probability weights</td>
+<td>0.903 ± 0.044</td>
+<td>0.928 [0.854, 0.994]</td>
+<td>0.834 ± 0.068</td>
+<td>0.820</td>
+<td>0.848</td>
+<td>0.527</td>
+<td>0.083</td>
+</tr>
+<tr>
+<td>UAGF</td>
+<td>0.913 ± 0.037</td>
+<td>0.931 [0.858, 0.994]</td>
+<td>0.854 ± 0.047</td>
+<td>0.823</td>
+<td>0.886</td>
+<td>0.564</td>
+<td>0.071</td>
+</tr>
+<tr>
+<td>NSGA-II balanced point</td>
+<td>0.924 ± 0.018</td>
+<td>0.948 [0.882, 0.997]</td>
+<td>0.878 ± 0.027</td>
+<td>0.855</td>
+<td>0.900</td>
+<td>0.605</td>
+<td>0.096</td>
+</tr>
+<tr>
+<td>NSGA-II screening point</td>
+<td>0.924 ± 0.022</td>
+<td>0.945 [0.881, 0.997]</td>
+<td>0.849 ± 0.021</td>
+<td>0.898</td>
+<td>0.800</td>
+<td>0.606</td>
+<td>0.075</td>
+</tr>
+<tr>
+<td>MC-dropout ensemble</td>
+<td>0.954 ± 0.009</td>
+<td>0.964 [0.917, 0.996]</td>
+<td>0.913 ± 0.015</td>
+<td>0.887</td>
+<td>0.938</td>
+<td>0.682</td>
+<td>0.170</td>
+</tr>
+<tr>
+<td>Cross-attention fusion</td>
+<td>0.734 ± 0.102</td>
+<td>0.935 [0.845, 0.997]</td>
+<td>0.655 ± 0.084</td>
+<td>0.576</td>
+<td>0.733</td>
+<td>0.217</td>
+<td>0.250</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="ROC and reliability" src="figures/roc_reliability.png" /></p>
+<p><img alt="Confusion matrices" src="figures/confusion.png" /></p>
+<p>The expected R1 → R2 → R3 improvement did not appear. R2 (0.851) and R3 (0.700) were both worse than M1 alone (0.932). The average and MC-dropout ensembles were best (0.954) with the highest MCC and the least variation across seeds. UAGF and the GA probability weights did not beat plain averaging but were among the best calibrated (ECE 0.071 and 0.083). NSGA-II delivered the intended trade-off: higher sensitivity at the screening point (0.898) and higher specificity at the balanced point (0.900) than M1 (0.894 and 0.805).</p>
+<h3>7.4 Why feature fusion lost</h3>
+<table>
+<thead>
+<tr>
+<th>Quantity (seed 0, fold 0)</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GA feature weights</td>
+<td>ResNet-34 0.22, DenseNet-121 0.76, ResNet-50 0.02; CV log-loss 0.474 → 0.471</td>
+</tr>
+<tr>
+<td>UAGF parameters</td>
+<td>β and two biases ended at their bounds</td>
+</tr>
+<tr>
+<td>Temperatures</td>
+<td>ResNet-50 0.11, MobileNetV3-Large 0.26 (very under-confident)</td>
+</tr>
+<tr>
+<td>NSGA-II balanced point</td>
+<td>Out-of-fold sens 0.919 / spec 0.952 → test 0.855 / 0.900</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="NSGA-II Pareto front" src="figures/nsga2_pareto.png" /></p>
+<p>Each training part contained only two CSC patient groups, so every GA fitness, fusion head and Pareto front was estimated from two CSC patients, and out-of-fold features came from different networks than test features. Methods that learn from features suffered most; methods that only average probabilities suffered least.</p>
+<h3>7.5 Matched-type evaluation</h3>
+<p>Comparing only screenshots (50 images, 8 CSC), the AUC fell from about 0.93 to 0.96 to between 0.688 and 0.792. Every method detected 83% to 94% of CSC volume frames but only 12.5% to 50% of CSC screenshots. The most reliable estimate for this dataset is a matched-type AUC of about 0.78 (M1 0.792, MC-dropout 0.783), with a 95% interval of roughly 0.46 to 0.97.</p>
+<h3>7.6 Harmonisation ablation</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>All, harmonised</th>
+<th>All, not harmonised</th>
+<th>Matched, harmonised</th>
+<th>Matched, not harmonised</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1 M1 alone</td>
+<td>0.932</td>
+<td>0.971</td>
+<td>0.792</td>
+<td>0.777</td>
+</tr>
+<tr>
+<td>R3 full fusion</td>
+<td>0.700</td>
+<td>0.620</td>
+<td>0.735</td>
+<td>0.497</td>
+</tr>
+<tr>
+<td>UAGF</td>
+<td>0.913</td>
+<td>0.906</td>
+<td>0.729</td>
+<td>0.637</td>
+</tr>
+<tr>
+<td>MC-dropout ensemble</td>
+<td>0.954</td>
+<td>0.967</td>
+<td>0.783</td>
+<td>0.771</td>
+</tr>
+</tbody>
+</table>
+<p>Harmonisation costs a little all-image AUC but improves every method on the matched-type comparison, most of all the feature-level methods.</p>
+<h3>7.7 Refer to clinician</h3>
+<table>
+<thead>
+<tr>
+<th>Uncertainty</th>
+<th>100% kept</th>
+<th>90%</th>
+<th>80%</th>
+<th>70%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MC-dropout variance</td>
+<td>0.913</td>
+<td>0.926</td>
+<td>0.936</td>
+<td>0.949</td>
+</tr>
+<tr>
+<td>UAGF entropy</td>
+<td>0.854</td>
+<td>0.882</td>
+<td>0.901</td>
+<td>0.914</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Referral curve" src="figures/refer_to_clinician.png" /></p>
+<p>Referring the 30% most uncertain scans raised balanced accuracy on the rest from 0.913 to 0.949, and the gain was monotonic. This is the most useful practical result: the system can run at a chosen referral rate with a known accuracy on the scans it decides.</p>
+<h3>7.8 Controls and explainability</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Same-scanner</th>
+<th>OCT-C8</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shuffled labels, M1 AUC</td>
+<td>0.437</td>
+<td>0.218</td>
+</tr>
+<tr>
+<td>Shuffled labels, R3 AUC</td>
+<td>0.502</td>
+<td>0.549</td>
+</tr>
+<tr>
+<td>Thumbnail-only CNN, AUC</td>
+<td>0.867</td>
+<td>1.000</td>
+</tr>
+</tbody>
+</table>
+<p>With shuffled labels the same-scanner AUCs sit near 0.5, so the pipeline does not leak labels. On OCT-C8 the shuffled M1 AUC falls far below 0.5, which is what two trivially separable clusters produce, not label leakage.</p>
+<p><img alt="Grad-CAM, same-scanner" src="figures/gradcam_same_scanner.png" /></p>
+<p>On the same-scanner data 0.37 of the Grad-CAM mass falls on retinal tissue that covers 0.20 of the image, about 1.8 times its area share. On OCT-C8 the maxima sit on an export overlay marker:</p>
+<p><img alt="Grad-CAM, OCT-C8" src="figures/gradcam_octc8.png" /></p>
+<h3>7.9 Cross-dataset and subtyping</h3>
+<table>
+<thead>
+<tr>
+<th>Trained on → tested on</th>
+<th>AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Same-scanner → same-scanner</td>
+<td>0.912</td>
+</tr>
+<tr>
+<td>Same-scanner → OCTID</td>
+<td>0.435</td>
+</tr>
+<tr>
+<td>Same-scanner → OCT-C8</td>
+<td>0.600</td>
+</tr>
+<tr>
+<td>OCT-C8 → OCTID</td>
+<td>1.000</td>
+</tr>
+<tr>
+<td>OCT-C8 → same-scanner screenshots</td>
+<td>0.711</td>
+</tr>
+</tbody>
+</table>
+<p>Models do not transfer between scanners. OCT-C8 → OCTID is perfect only because the two public datasets share sources.</p>
+<p>Acute versus chronic subtyping (leave-one-patient-out on five patients) gave an eye-level balanced accuracy of 0.240 ± 0.049, systematically inverted. With two chronic patients, the model can only learn one person's appearance, so five patients cannot support subtyping.</p>
+<h2>8. Discussion</h2>
+<p>The results separate what can and cannot be claimed. OCT-C8 scores, including the preliminary 100% accuracies, are not evidence of CSC detection. On the same-scanner data the models reach all-image AUCs of 0.93 to 0.96 and attend to the retina, but the matched-type AUC is about 0.78 and performance does not transfer to other scanners. Within these limits, simple probability ensembles are the best performers, NSGA-II gives selectable operating points, and uncertainty-based referral reliably improves accuracy on the scans the system keeps. Feature-level fusion needs more patients and a dedicated meta set before it can be judged fairly.</p>
+<h2>9. The application</h2>
+<p>The CSC OCT Analyser is a Flask web app that runs the whole pipeline on an uploaded scan and streams each stage live: input check, preprocessing, five backbones with Grad-CAM, PCA and GA fusion, ensembles, UAGF, NSGA-II, MC-dropout, a heuristic region-of-interest overlay, an experimental stage estimate and the decision. Screening mode (P(CSC) ≥ 0.355, the lowest threshold keeping at least 95% specificity on validation patients) is the default, and scans in the grey zone or with disagreeing models are marked uncertain. Each analysis produces a web report and a PDF. With <code>CSC_PUBLIC=1</code> the history page lists nothing and uploads are deleted after analysis.</p>
+<p><img alt="Report" src="screenshots/report.png" /></p>
+<p><img alt="Model and validation" src="screenshots/model.png" /></p>
+<h2>10. Reproducing the study</h2>
+<pre><code class="language-bash">cd csc_v3 &amp;&amp; zsh run_mac.sh      # full study, about 4 to 6 hours on an Apple-silicon Mac
+zsh csc_app/run.sh               # web app on http://localhost:5050
+</code></pre>
+<p>A Colab notebook runs the same code on an NVIDIA T4. Datasets are downloaded from Kaggle and Mendeley Data.</p>
+<h2>11. Limitations and future work</h2>
+<ul>
+<li>Five CSC patients in the same-scanner data; all intervals are wide.</li>
+<li>Export-type confound; the matched-type estimate rests on eight CSC screenshots.</li>
+<li>No transfer to other scanners.</li>
+<li>Out-of-fold and test features come from different networks; a blending design with a dedicated meta set would fix this.</li>
+<li>Several ablations and controls used one seed.</li>
+</ul>
+<p>Future work: one device and export path with 30 or more patients, a blending meta stage, clinician-annotated acute and chronic labels on OCT volumes, a referral analysis by image type, retinal foundation models and volume-level aggregation, and external validation on another hospital's scanner.</p>
+<h2>12. References</h2>
+<ol>
+<li>T. Hassan, M. U. Akram and M. N. Nazir, "A composite retinal fundus and OCT dataset with detailed clinical markings of retinal layers and retinal lesions," Mendeley Data, v4, 2021.</li>
+<li>P. Gholami et al., "OCTID: Optical coherence tomography image database," <em>Comput. Electr. Eng.</em>, vol. 81, 106532, 2020.</li>
+<li>J. Yoon et al., "Classifying central serous chorioretinopathy subtypes with a deep neural network using optical coherence tomography images," <em>Sci. Rep.</em>, vol. 12, 422, 2022.</li>
+<li>A. Daruich et al., "Central serous chorioretinopathy: Recent findings and new physiopathology hypothesis," <em>Prog. Retin. Eye Res.</em>, vol. 48, pp. 82–118, 2015.</li>
+<li>K. Deb et al., "A fast and elitist multiobjective genetic algorithm: NSGA-II," <em>IEEE Trans. Evol. Comput.</em>, vol. 6, no. 2, pp. 182–197, 2002.</li>
+<li>Y. Gal and Z. Ghahramani, "Dropout as a Bayesian approximation," in <em>Proc. ICML</em>, 2016, pp. 1050–1059.</li>
+<li>R. Geirhos et al., "Shortcut learning in deep neural networks," <em>Nat. Mach. Intell.</em>, vol. 2, pp. 665–673, 2020.</li>
+<li>J. R. Zech et al., "Variable generalization performance of a deep learning model to detect pneumonia in chest radiographs," <em>PLOS Med.</em>, vol. 15, e1002683, 2018.</li>
+<li>D. S. Kermany et al., "Identifying medical diagnoses and treatable diseases by image-based deep learning," <em>Cell</em>, vol. 172, pp. 1122–1131, 2018.</li>
+<li>F.-A. Fortin et al., "DEAP: Evolutionary algorithms made easy," <em>J. Mach. Learn. Res.</em>, vol. 13, pp. 2171–2175, 2012.</li>
+</ol></main></body></html>

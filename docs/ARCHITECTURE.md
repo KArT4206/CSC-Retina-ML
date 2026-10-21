@@ -36,4 +36,4 @@ Splits are made over patients (or near-duplicate clusters), never single images.
 | `csc_app/pdf_report.py` | Builds the downloadable PDF report |
 | `csc_v3/` | The research pipeline the app reuses for preprocessing, backbones and fusion |
 
-In the public deployment, the history page lists nothing and uploaded images are deleted when their analysis finishes, so visitors never see each other's scans.
+With `CSC_PUBLIC=1`, the history page lists nothing and uploaded images are deleted when their analysis finishes, so visitors never see each other's scans.

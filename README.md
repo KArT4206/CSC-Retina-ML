@@ -2,7 +2,6 @@
 
 > This repository documents the project (description, method, results, screenshots). The source code lives in a private repository, `CSC-Retina-ML-code`.
 
-**Live demo:** _deployment in progress_
 **Project site:** [https://kart4206.github.io/CSC-Retina-ML/](https://kart4206.github.io/CSC-Retina-ML/)
 
 Detects central serous chorioretinopathy (CSC) on retinal OCT B-scans by fusing five pretrained CNNs, and refers uncertain scans to a clinician. The study behind it also tests whether high benchmark scores come from the disease or from how the images were collected.
@@ -54,7 +53,7 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Retinal OCT-C8 can be separated from 16 × 16 thumbnails or image size alone (AUC 1.000), so near-perfect scores on it are not evidence of CSC detection.
 - Comparing only images exported the same way (matched type), the AUC is about 0.78. With shuffled training labels it falls to 0.437 to 0.502, which shows the pipeline does not leak labels.
 
-Full tables and figures: [docs/RESULTS.md](docs/RESULTS.md).
+Full tables and figures: [docs/RESULTS.md](docs/RESULTS.md). The complete write-up is in [docs/REPORT.md](docs/REPORT.md).
 
 ## Screenshots
 
@@ -65,7 +64,7 @@ Full tables and figures: [docs/RESULTS.md](docs/RESULTS.md).
 
 ## Tech stack
 
-Python, PyTorch and torchvision, scikit-learn, DEAP (GA and NSGA-II), Flask with server-sent events, Matplotlib (PDF reports). The live demo runs in a Docker container on a Hugging Face Space (CPU).
+Python, PyTorch and torchvision, scikit-learn, DEAP (GA and NSGA-II), Flask with server-sent events, Matplotlib (PDF reports). The app runs locally with `zsh csc_app/run.sh`.
 
 ## Limitations
 
