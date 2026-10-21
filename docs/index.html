@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSC OCT Analyser</title>
+<meta name="description" content="Central serous chorioretinopathy detection on OCT with multi-model fusion and uncertainty-based referral.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f9;--surface:#fff;--border:#e2e5ea;--text:#111827;--text2:#4b5563;--text3:#8a93a1;--accent:#b42318;--soft:#f3f4f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--surface:#151b23;--border:#2a323d;--text:#e6e9ee;--text2:#a9b1bc;--text3:#6f7a88;--accent:#ff7b6e;--soft:#1c232d}}
+:root[data-theme="dark"]{--bg:#0d1117;--surface:#151b23;--border:#2a323d;--text:#e6e9ee;--text2:#a9b1bc;--text3:#6f7a88;--accent:#ff7b6e;--soft:#1c232d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 Inter,system-ui,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:40px 16px 64px}h1{font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;margin:0 0 8px;line-height:1.15}
+h2{font-size:20px;margin:48px 0 12px}p,li{color:var(--text2)}.tag{display:inline-block;font-size:12px;font-weight:600;color:#b54708;background:#fef4e6;border-radius:999px;padding:3px 10px;margin-bottom:16px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}.btn{text-decoration:none;font-weight:600;padding:10px 16px;border-radius:8px;border:1px solid var(--border);color:var(--text);background:var(--surface)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.disabled{color:var(--text3)}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.kpi div{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.kpi span{display:block;font-size:12px;color:var(--text3)}.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);font-variant-numeric:tabular-nums}
+th,td{padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;white-space:nowrap}th{font-size:12px;color:var(--text3);font-weight:500;text-transform:uppercase}
+tr.hl td{font-weight:600;background:var(--soft)}
+img{max-width:100%;border-radius:10px;border:1px solid var(--border);background:#fff}figure{margin:0}figcaption{font-size:13px;color:var(--text3);margin-top:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:18px}footer{border-top:1px solid var(--border);color:var(--text3);font-size:13px;text-align:center;padding:24px 16px}
+</style></head><body><main>
+<span class="tag">Research use only</span>
+<h1>CSC OCT Analyser</h1>
+<p style="font-size:17px">Central serous chorioretinopathy detection on OCT B-scans with five fused CNNs, selectable screening and balanced operating points, and referral of uncertain scans to a clinician. The study behind it also checks whether high scores come from the disease or from how the images were collected.</p>
+<p>Sai Sathya Krishna A R, Karthik B, Adharsh Ramakrishnan, Dr. Swaminathan A · VIT Chennai</p>
+<div class="btns"><span class="btn disabled">Live demo coming soon</span><a class="btn" href="https://github.com/KArT4206/CSC-Retina-ML">Documentation on GitHub</a></div>
+<img src="screenshots/report.png" alt="Analysis report for a CSC scan">
+
+<h2>Key results</h2>
+<div class="kpi"><div><span>Best per-seed AUC (average and MC-dropout ensembles)</span><b>0.954</b></div>
+<div><span>Balanced accuracy, all scans → 30% referred</span><b>0.913 → 0.949</b></div>
+<div><span>Matched-type AUC (same export type)</span><b>≈ 0.78</b></div>
+<div><span>OCT-C8 from 16 × 16 thumbnails</span><b>AUC 1.000</b></div></div>
+<div class="scroll" style="margin-top:14px"><table><thead><tr><th>Method</th><th>AUC per seed</th><th>Balanced acc.</th><th>Sens.</th><th>Spec.</th><th>Matched-type AUC</th></tr></thead><tbody><tr class=""><td>R1 M1 alone</td><td>0.932 ± 0.018</td><td>0.849 ± 0.025</td><td>0.894</td><td>0.805</td><td>0.792</td></tr><tr class=""><td>R2 GA-weighted M2–M4</td><td>0.851 ± 0.052</td><td>0.768 ± 0.045</td><td>0.751</td><td>0.786</td><td>0.723</td></tr><tr class=""><td>R3 full fusion</td><td>0.700 ± 0.110</td><td>0.646 ± 0.082</td><td>0.735</td><td>0.557</td><td>0.735</td></tr><tr class="hl"><td>Average ensemble</td><td>0.954 ± 0.010</td><td>0.909 ± 0.016</td><td>0.885</td><td>0.933</td><td>0.783</td></tr><tr class=""><td>Temperature-scaled ensemble</td><td>0.938 ± 0.016</td><td>0.890 ± 0.032</td><td>0.865</td><td>0.914</td><td>0.756</td></tr><tr class=""><td>GA probability weights</td><td>0.903 ± 0.044</td><td>0.834 ± 0.068</td><td>0.820</td><td>0.848</td><td>0.688</td></tr><tr class=""><td>UAGF</td><td>0.913 ± 0.037</td><td>0.854 ± 0.047</td><td>0.823</td><td>0.886</td><td>0.729</td></tr><tr class=""><td>NSGA-II balanced point</td><td>0.924 ± 0.018</td><td>0.878 ± 0.027</td><td>0.855</td><td>0.900</td><td>0.774</td></tr><tr class=""><td>NSGA-II screening point</td><td>0.924 ± 0.022</td><td>0.849 ± 0.021</td><td>0.898</td><td>0.800</td><td>0.735</td></tr><tr class="hl"><td>MC-dropout ensemble</td><td>0.954 ± 0.009</td><td>0.913 ± 0.015</td><td>0.887</td><td>0.938</td><td>0.783</td></tr><tr class=""><td>Cross-attention fusion</td><td>0.734 ± 0.102</td><td>0.655 ± 0.084</td><td>0.576</td><td>0.733</td><td>0.723</td></tr></tbody></table></div>
+<p>Same-scanner dataset, 5 seeds × 4 patient-grouped folds. Simple probability ensembles beat GA-weighted feature fusion here, because each training fold held only two CSC patient groups.</p>
+
+<h2>How it works</h2>
+<figure><img src="figures/architecture.png" alt="Fusion architecture"></figure>
+<div class="grid" style="margin-top:18px">
+<figure><img src="figures/refer_to_clinician.png" alt="Referral curve"><figcaption>Referring uncertain scans raises accuracy on the rest</figcaption></figure>
+<figure><img src="figures/nsga2_pareto.png" alt="NSGA-II Pareto front"><figcaption>NSGA-II balanced and screening operating points</figcaption></figure>
+<figure><img src="figures/roc_reliability.png" alt="ROC and reliability"><figcaption>ROC curves and calibration</figcaption></figure>
+<figure><img src="figures/gradcam_same_scanner.png" alt="Grad-CAM"><figcaption>Grad-CAM on same-scanner test scans</figcaption></figure>
+</div>
+
+<h2>The app</h2>
+<div class="grid">
+<figure><img src="screenshots/analyse.png" alt="Analyse page"><figcaption>Upload or pick an example</figcaption></figure>
+<figure><img src="screenshots/model.png" alt="Model and validation page"><figcaption>Model and validation</figcaption></figure>
+<figure><img src="screenshots/about.png" alt="About CSC page"><figcaption>CSC stages explained</figcaption></figure>
+</div>
+
+<h2>Limitations</h2>
+<ul><li>Five CSC patients in the same-scanner data, so intervals are wide.</li>
+<li>Models do not transfer to other scanners in cross-dataset tests (AUC 0.435 and 0.600).</li>
+<li>Acute versus chronic subtyping is experimental and not reliable.</li></ul>
+</main><footer>CSC OCT Analyser · research software, not a medical device</footer></body></html>
